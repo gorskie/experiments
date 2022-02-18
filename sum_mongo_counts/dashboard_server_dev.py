@@ -18,13 +18,13 @@ class Dashboard:
 def get_jobs_stats(database):
     jobs_waiting = int(database.llen('jobs_waiting_queue'))
     jobs_in_progress = int(database.hlen('jobs_in_progress'))
-    jobs_total = jobs_waiting + jobs_in_progress + jobs_done
+    jobs_total_minus_jobs_done = jobs_waiting + jobs_in_progress
     client_ids = database.get('total_num_client_ids')
     clients_total = int(client_ids) if client_ids is not None else 0
     return {
         'num_jobs_waiting': jobs_waiting,
         'num_jobs_in_progress': jobs_in_progress,
-        'jobs_total': jobs_total,
+        'jobs_total': jobs_total_minus_jobs_done,
         'clients_total': clients_total
     }
 
@@ -52,15 +52,24 @@ def create_server(database, docker_server, mongo_client):
 
     @dashboard.app.route('/data', methods=['GET'])
     def _get_dashboard_data():
+        """ returns data as json and request status code """
+        # Get the jobs stats in the redis db
         data = get_jobs_stats(dashboard.redis)
-        data.update({'num_jobs_done': get_done_counts(dashboard.mongo, 'mirrulations')})
+        # Get the number of jobs done from the mongo db and add it to the data
+        jobs_done = get_done_counts(dashboard.mongo, 'mirrulations')
+        data.update({'num_jobs_done': jobs_done})
+        # Add this value to the total jobs
+        data['jobs_total'] += jobs_done
+        # Add container info to data
         container_information = get_container_stats(dashboard.docker)
         data.update(container_information)
+
         return jsonify(data), 200
 
     return dashboard
 
 
 if __name__ == '__main__':
+    # TODO: this should probably have some exception handling here
     server = create_server(Redis('redis'), docker.from_env(), connect_mongo_db('mongo'))
     server.app.run(port=5000)

@@ -3,6 +3,8 @@ from flask_cors import CORS
 from redis import Redis
 from pymongo import MongoClient
 from sum_mongo_counts import connect_mongo_db, get_done_counts
+from dotenv import load_dotenv
+import os
 import docker
 
 
@@ -70,6 +72,9 @@ def create_server(database, docker_server, mongo_client):
 
 
 if __name__ == '__main__':
+    load_dotenv()
     # TODO: this should probably have some exception handling here
-    server = create_server(Redis('redis'), docker.from_env(), connect_mongo_db('mongo'))
+    server = create_server(Redis(os.getenv('REDIS_HOSTNAME')), 
+                          docker.from_env(), 
+                          connect_mongo_db(os.getenv('MONGO_HOSTNAME')))
     server.app.run(port=5000)

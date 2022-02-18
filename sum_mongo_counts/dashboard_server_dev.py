@@ -18,14 +18,12 @@ class Dashboard:
 def get_jobs_stats(database):
     jobs_waiting = int(database.llen('jobs_waiting_queue'))
     jobs_in_progress = int(database.hlen('jobs_in_progress'))
-    jobs_done = int(get_done_counts(database.mongo, 'mirrulations'))
     jobs_total = jobs_waiting + jobs_in_progress + jobs_done
     client_ids = database.get('total_num_client_ids')
     clients_total = int(client_ids) if client_ids is not None else 0
     return {
         'num_jobs_waiting': jobs_waiting,
         'num_jobs_in_progress': jobs_in_progress,
-        'num_jobs_done': jobs_done,
         'jobs_total': jobs_total,
         'clients_total': clients_total
     }
@@ -55,6 +53,7 @@ def create_server(database, docker_server, mongo_client):
     @dashboard.app.route('/data', methods=['GET'])
     def _get_dashboard_data():
         data = get_jobs_stats(dashboard.redis)
+        data.update({'num_jobs_done': get_done_counts(dashboard.mongo, 'mirrulations')})
         container_information = get_container_stats(dashboard.docker)
         data.update(container_information)
         return jsonify(data), 200
